@@ -1,5 +1,5 @@
 # Set default values for build arguments
-ARG PARENT_VERSION=2.2.1-python3.14.3
+ARG PARENT_VERSION=2.7.0-python3.14.6
 ARG PORT=8085
 ARG PORT_DEBUG=8086
 
@@ -14,6 +14,7 @@ COPY --chown=nonroot:nonroot pyproject.toml .
 COPY --chown=nonroot:nonroot README.md .
 COPY --chown=nonroot:nonroot uv.lock .
 COPY --chown=nonroot:nonroot app/ ./app/
+COPY --chown=nonroot:nonroot data/ ./data/
 
 RUN --mount=type=cache,target=/home/nonroot/.cache/uv,uid=1000,gid=1000 \
     uv sync --locked --link-mode=copy
@@ -25,7 +26,7 @@ ARG PORT_DEBUG=8086
 ENV PORT=${PORT}
 EXPOSE ${PORT} ${PORT_DEBUG}
 
-CMD [ "-m", "app.main" ]
+CMD [ "/home/nonroot/.venv/bin/mural-api-stub" ]
 
 FROM defradigital/python:${PARENT_VERSION} AS production
 
@@ -34,8 +35,9 @@ ENV LOG_CONFIG="logging.json"
 
 USER root
 
-RUN apt update && \
-    apt install -y curl
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
 
 USER nonroot
 
@@ -45,6 +47,7 @@ COPY --from=development /home/nonroot/pyproject.toml .
 COPY --chown=nonroot:nonroot README.md .
 COPY --from=development /home/nonroot/uv.lock .
 COPY --from=development /home/nonroot/app ./app
+COPY --from=development /home/nonroot/data ./data
 
 COPY logging.json .
 
@@ -56,4 +59,4 @@ ARG PORT
 ENV PORT=${PORT}
 EXPOSE ${PORT}
 
-CMD [ "-m", "app.main" ]
+CMD [ "/home/nonroot/.venv/bin/mural-api-stub" ]
