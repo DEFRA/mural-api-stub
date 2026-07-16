@@ -1,10 +1,10 @@
 import logging
-from typing import Annotated
 
 import pydantic
 import pydantic_settings
 
 logger = logging.getLogger(__name__)
+
 
 class AppConfig(pydantic_settings.BaseSettings):
     model_config = pydantic_settings.SettingsConfigDict()
@@ -22,7 +22,11 @@ class AppConfig(pydantic_settings.BaseSettings):
     http_proxy: pydantic.HttpUrl | None = None
     enable_metrics: bool = False
     tracing_header: str = "x-cdp-request-id"
-    
+    s3_bucket: str = "mural-api-stub-data"
+    default_widget_page_limit: int = 100
+    default_workspace_id: str | None = None
+    stub_token_expires_in: int = 900
+
 
 _config: AppConfig | None = None
 

@@ -180,10 +180,152 @@ uv run pytest
 
 ## API endpoints
 
-| Endpoint                 | Method | Description                           |
-| :----------------------- | :----- | :------------------------------------ |
-| `GET: /docs`             | GET    | Automatic API Swagger docs            |
-| `GET: /health`           | GET    | Health check endpoint                 |
+| Endpoint                           | Method | Description                           |
+| :--------------------------------- | :----- | :------------------------------------ |
+| `GET: /health`                     | GET    | Health check endpoint                 |
+| `POST: /api/public/v1/authorization/oauth2/token` | POST | Fake OAuth2 token endpoint (stub tokens, no credential validation) |
+| `GET: /api/public/v1/murals/{id}`  | GET    | Get a mural (board)                   |
+| `GET: /api/public/v1/murals/{id}/widgets` | GET    | Get widgets in a mural with pagination |
+| `GET: /docs`                       | GET    | Automatic API Swagger docs            |
+
+### Example cURL requests
+
+#### Health check
+
+```bash
+curl http://localhost:8085/health
+```
+
+Response (200):
+```json
+{"status": "ok"}
+```
+
+#### OAuth2 token (fake)
+
+Real OAuth is out of scope for this stub (see [developers.mural.co/public/docs/oauth](https://developers.mural.co/public/docs/oauth)), but the MCP server calls Mural's token endpoint constantly to keep its 15-minute access token fresh. This endpoint returns freshly generated stub tokens for both `authorization_code` and `refresh_token` grants, without validating any credentials. It accepts either form-encoded or JSON request bodies.
+
+```bash
+# authorization_code grant (form-encoded)
+curl -s -X POST http://localhost:8085/api/public/v1/authorization/oauth2/token \
+  -d grant_type=authorization_code -d client_id=x -d client_secret=y \
+  -d code=abc -d redirect_uri=http://localhost/cb
+
+# refresh_token grant (JSON)
+curl -s -X POST http://localhost:8085/api/public/v1/authorization/oauth2/token \
+  -H 'Content-Type: application/json' \
+  -d '{"grant_type":"refresh_token","refresh_token":"old"}'
+```
+
+Response (200):
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "token_type": "bearer",
+  "expires_in": 900
+}
+```
+
+Error (400, unknown/missing `grant_type`):
+```json
+{
+  "error": "unsupported_grant_type",
+  "error_description": "Unsupported grant_type: 'client_credentials'"
+}
+```
+
+#### Get a mural
+
+```bash
+# Retrieve a mural by ID (using workspace.board format or default workspace)
+curl http://localhost:8085/api/public/v1/murals/workspace1.board1
+```
+
+Response (200):
+```json
+{
+  "value": {
+    "id": "board1",
+    "title": "Demo Board",
+    ...
+  }
+}
+```
+
+Error (404):
+```json
+{
+  "code": "MURAL_NOT_FOUND",
+  "message": "Mural not found: workspace1.missing"
+}
+```
+
+#### Get mural widgets
+
+```bash
+# Get all widgets in a mural
+curl http://localhost:8085/api/public/v1/murals/workspace1.board1/widgets
+
+# Get widgets with pagination (limit 10 per page)
+curl "http://localhost:8085/api/public/v1/murals/workspace1.board1/widgets?limit=10"
+
+# Get the next page using the cursor from the previous response
+curl "http://localhost:8085/api/public/v1/murals/workspace1.board1/widgets?limit=10&next=10"
+
+# Filter by widget type(s) (comma-separated)
+curl "http://localhost:8085/api/public/v1/murals/workspace1.board1/widgets?type=sticky,text"
+
+# Filter by parent ID (for nested widgets)
+curl "http://localhost:8085/api/public/v1/murals/workspace1.board1/widgets?parentId=parent123"
+
+# Combine filters and pagination
+curl "http://localhost:8085/api/public/v1/murals/workspace1.board1/widgets?type=sticky&parentId=parent123&limit=5"
+```
+
+Response (200):
+```json
+{
+  "value": [
+    {
+      "id": "widget1",
+      "type": "sticky",
+      "parentId": null,
+      ...
+    },
+    {
+      "id": "widget2",
+      "type": "text",
+      "parentId": "parent123",
+      ...
+    }
+  ],
+  "next": "2"
+}
+```
+
+Error responses (400):
+```json
+{
+  "code": "PAGINATION_INVALID",
+  "message": "Invalid pagination token: abc"
+}
+```
+
+```json
+{
+  "code": "LIMIT_INVALID",
+  "message": "Invalid limit: 0"
+}
+```
+
+Error (404):
+```json
+{
+  "code": "MURAL_NOT_FOUND",
+  "message": "Mural not found: workspace1.missing"
+}
+```
 
 ## Custom Cloudwatch Metrics
 
